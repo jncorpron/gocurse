@@ -1,4 +1,4 @@
-package forms
+package curses
 
 // #define _Bool int
 // #include <form.h>
@@ -6,7 +6,6 @@ package forms
 import "C"
 
 import (
-	. "github.com/errnoh/gocurse/curses"
 	"unsafe"
 )
 
@@ -102,27 +101,15 @@ const (
 	MAX_FORM_COMMAND = C.MAX_FORM_COMMAND
 )
 
-type FormsError struct {
-	message string
-}
-
-func (fe FormsError) Error() string {
-	return fe.message
-}
-
-/*
-* FIELD METHODS
- */
-
-func NewField(height int, width int, top int, left int, offscreen int, nbuf int) (*Field, error) {
-	field := (*Field)(C.new_field(C.int(height), C.int(width), C.int(top), C.int(left), C.int(offscreen), C.int(nbuf)))
+func NewField(height int, width int, top int, left int, offScreen int, numAddBufs int) (*Field, error) {
+	field := (*Field)(C.new_field(C.int(height), C.int(width), C.int(top), C.int(left), C.int(offScreen), C.int(numAddBufs)))
 	if field == nil {
 		return nil, FormsError{"NewField failed"}
 	}
 	return field, nil
 }
 
-func (field *Field) DupField(top int, left int) (*Field, error) {
+func (field *Field) Duplicate(top int, left int) (*Field, error) {
 	dup := (*Field)(C.dup_field((*C.FIELD)(field), C.int(top), C.int(left)))
 	if dup == nil {
 		return nil, FormsError{"Field.Dup failed"}
@@ -145,34 +132,23 @@ func (field *Field) Free() error {
 	return nil
 }
 
-func (field *Field) Info() (int, int, int, int, int, int, error) {
-	var (
-		height    C.int
-		width     C.int
-		top       C.int
-		left      C.int
-		offscreen C.int
-		nbuf      C.int
-	)
-	if C.field_info((*C.FIELD)(field), &height, &width, &top, &left, &offscreen, &nbuf) != C.OK {
+func (field *Field) Info() (height int, width int, top int, left int, offScreen int, numAddBufs int, err error) {
+	var cHeight, cWidth, cTop, cLeft, cOffScreen, cNumAddBufs C.int
+	if C.field_info((*C.FIELD)(field), &cHeight, &cWidth, &cTop, &cLeft, &cOffScreen, &cNumAddBufs) != C.OK {
 		return 0, 0, 0, 0, 0, 0, FormsError{"Field.Info failed"}
 	}
-	return int(height), int(width), int(top), int(left), int(offscreen), int(nbuf), nil
+	return int(cHeight), int(cWidth), int(cTop), int(cLeft), int(cOffScreen), int(cNumAddBufs), nil
 }
 
-func (field *Field) DynamicInfo() (int, int, int, error) {
-	var (
-		prows C.int
-		pcols C.int
-		pmax  C.int
-	)
-	if C.dynamic_field_info((*C.FIELD)(field), &prows, &pcols, &pmax) != C.OK {
+func (field *Field) DynamicInfo() (rows int, columns int, maxGrowth int, err error) {
+	var cRows, cColumns, cMaxGrowth C.int
+	if C.dynamic_field_info((*C.FIELD)(field), &cRows, &cColumns, &cMaxGrowth) != C.OK {
 		return 0, 0, 0, FormsError{"Field.DynamicInfo failed"}
 	}
-	return int(prows), int(pcols), int(pmax), nil
+	return int(cRows), int(cColumns), int(cMaxGrowth), nil
 }
 
-func (field *Field) SetMax(max int) bool {
+func (field *Field) SetMaxGrowth(max int) bool {
 	return isOk(C.set_max_field((*C.FIELD)(field), C.int(max)))
 }
 
@@ -184,81 +160,77 @@ func (field *Field) SetNewPage(newPage bool) bool {
 	return isOk(C.set_new_page((*C.FIELD)(field), boolToInt(newPage)))
 }
 
-func (field *Field) SetJust(justMode int) bool {
+func (field *Field) SetJustification(justMode int) bool {
 	return isOk(C.set_field_just((*C.FIELD)(field), C.int(justMode)))
 }
 
-func (field *Field) Just() int {
-	return (int)(C.field_just((*C.FIELD)(field)))
+func (field *Field) GetJustification() int {
+	return int(C.field_just((*C.FIELD)(field)))
 }
 
-func (field *Field) SetFore(fore Chtype) bool {
-	return isOk(C.set_field_fore((*C.FIELD)(field), (C.chtype)(fore)))
+func (field *Field) SetForeground(foreground int) bool {
+	return isOk(C.set_field_fore((*C.FIELD)(field), C.chtype(foreground)))
 }
 
-func (field *Field) SetBack(back Chtype) bool {
-	return isOk(C.set_field_back((*C.FIELD)(field), (C.chtype)(back)))
+func (field *Field) SetBackground(background int) bool {
+	return isOk(C.set_field_back((*C.FIELD)(field), C.chtype(background)))
 }
 
-func (field *Field) SetPad(pad int) bool {
-	return isOk(C.set_field_pad((*C.FIELD)(field), (C.bool)(C.int(pad))))
+func (field *Field) SetPaddingChar(paddingChar int) bool {
+	return isOk(C.set_field_pad((*C.FIELD)(field), C.bool(C.int(paddingChar))))
 }
 
-func (field *Field) Pad() int {
-	return (int)(C.field_pad((*C.FIELD)(field)))
-}
-
-func (field *Field) SetBuffer(ind int, message string) bool {
-	return isOk(C.set_field_buffer((*C.FIELD)(field), C.int(ind), C.CString(message)))
+func (field *Field) SetBuffer(index int, message string) bool {
+	return isOk(C.set_field_buffer((*C.FIELD)(field), C.int(index), C.CString(message)))
 }
 
 func (field *Field) SetStatus(status bool) bool {
 	return isOk(C.set_field_status((*C.FIELD)(field), boolToInt(status)))
 }
 
-func (field *Field) SetOpts(attr FieldOptions) bool {
-	return isOk(C.set_field_opts((*C.FIELD)(field), (C.Field_Options)(attr)))
+func (field *Field) SetOptions(attr FieldOptions) bool {
+	return isOk(C.set_field_opts((*C.FIELD)(field), C.Field_Options(attr)))
 }
 
-func (field *Field) OptsOn(attr FieldOptions) bool {
-	return isOk(C.field_opts_on((*C.FIELD)(field), (C.Field_Options)(attr)))
+func (field *Field) OptionsOn(attr FieldOptions) bool {
+	return isOk(C.field_opts_on((*C.FIELD)(field), C.Field_Options(attr)))
 }
 
-func (field *Field) OptsOff(attr FieldOptions) bool {
-	return isOk(C.field_opts_off((*C.FIELD)(field), (C.Field_Options)(attr)))
+func (field *Field) OptionsOff(attr FieldOptions) bool {
+	return isOk(C.field_opts_off((*C.FIELD)(field), C.Field_Options(attr)))
 }
 
-func (field *Field) Buffer(ind int) string {
-	buf := C.field_buffer((*C.FIELD)(field), C.int(ind))
+func (field *Field) Buffer(index int) string {
+	buf := C.field_buffer((*C.FIELD)(field), C.int(index))
 	return C.GoString(buf)
 }
 
-func (field *Field) Fore() Chtype {
-	return (Chtype)(C.field_fore((*C.FIELD)(field)))
+func (field *Field) Foreground() int {
+	return int(C.field_fore((*C.FIELD)(field)))
 }
 
-func (field *Field) Back() Chtype {
-	return (Chtype)(C.field_back((*C.FIELD)(field)))
+func (field *Field) Background() int {
+	return int(C.field_back((*C.FIELD)(field)))
 }
 
-func (field *Field) NewPage() bool {
+func (field *Field) PaddingChar() int {
+	return int(C.field_pad((*C.FIELD)(field)))
+}
+
+func (field *Field) IsNewPage() bool {
 	return intToBool(C.new_page((*C.FIELD)(field)))
 }
 
-func (field *Field) Opts() FieldOptions {
-	return (FieldOptions)(C.field_opts((*C.FIELD)(field)))
+func (field *Field) Options() FieldOptions {
+	return FieldOptions(C.field_opts((*C.FIELD)(field)))
 }
 
 func (field *Field) Index() int {
-	return (int)(C.field_index((*C.FIELD)(field)))
+	return int(C.field_index((*C.FIELD)(field)))
 }
 
-/*
-* FORM METHODS
- */
-
 func NewForm(fields []*Field) (*Form, error) {
-	form := (*Form)(C.new_form((**C.FIELD)(void(&fields[0]))))
+	form := (*Form)(C.new_form((**C.FIELD)(unsafe.Pointer(&fields[0]))))
 	if form == nil {
 		return nil, FormsError{"NewForm failed"}
 	}
@@ -282,11 +254,11 @@ func (form *Form) Free() bool {
 }
 
 func (form *Form) SetFields(fields []*Field) bool {
-	return isOk(C.set_form_fields((*C.FORM)(form), (**C.FIELD)(void(&fields[0]))))
+	return isOk(C.set_form_fields((*C.FORM)(form), (**C.FIELD)(unsafe.Pointer(&fields[0]))))
 }
 
 func (form *Form) FieldCount() int {
-	return (int)(C.field_count((*C.FORM)(form)))
+	return int(C.field_count((*C.FORM)(form)))
 }
 
 func (form *Form) SetCurrentField(field *Field) bool {
@@ -298,7 +270,7 @@ func (form *Form) SetPage(page int) bool {
 }
 
 func (form *Form) Page() int {
-	return (int)(C.form_page((*C.FORM)(form)))
+	return int(C.form_page((*C.FORM)(form)))
 }
 
 func (form *Form) Post() bool {
@@ -313,45 +285,50 @@ func (form *Form) Drive(req int) bool {
 	return isOk(C.form_driver((*C.FORM)(form), C.int(req)))
 }
 
-func (form *Form) Opts() FormOptions {
+func (form *Form) Options() FormOptions {
 	return (FormOptions)(C.form_opts((*C.FORM)(form)))
 }
 
-func (form *Form) SetOpts(attr FormOptions) bool {
+func (form *Form) SetOptions(attr FormOptions) bool {
 	return isOk(C.set_form_opts((*C.FORM)(form), (C.Form_Options)(attr)))
 }
 
-func (form *Form) OptsOn(attr FormOptions) bool {
+func (form *Form) OptionsOn(attr FormOptions) bool {
 	return isOk(C.form_opts_on((*C.FORM)(form), (C.Form_Options)(attr)))
 }
 
-func (form *Form) OptsOff(attr FormOptions) bool {
+func (form *Form) OptionsOff(attr FormOptions) bool {
 	return isOk(C.form_opts_off((*C.FORM)(form), (C.Form_Options)(attr)))
 }
 
-func (form *Form) Scale() (int, int, error) {
-	var (
-		rows C.int
-		cols C.int
-	)
-	if C.scale_form((*C.FORM)(form), &rows, &cols) != C.OK {
+func (form *Form) Scale() (rows int, columns int, err error) {
+	var cRows, cColumns C.int
+	if C.scale_form((*C.FORM)(form), &cRows, &cColumns) != C.OK {
 		return 0, 0, FormsError{"Form.Scale failed"}
 	}
-	return int(rows), int(cols), nil
+	return int(cRows), int(cColumns), nil
 }
 
-func (form *Form) SetWin(window *Window) bool {
+func (form *Form) SetWindow(window *Window) bool {
 	return isOk(C.set_form_win((*C.FORM)(form), (*C.WINDOW)(unsafe.Pointer(window))))
 }
 
-func (form *Form) SetSub(window *Window) bool {
+func (form *Form) SetSubWindow(window *Window) bool {
 	return isOk(C.set_form_sub((*C.FORM)(form), (*C.WINDOW)(unsafe.Pointer(window))))
 }
 
-func (form *Form) Win() *Window {
+func (form *Form) Window() *Window {
 	return (*Window)(unsafe.Pointer((C.form_win((*C.FORM)(form)))))
 }
 
-func (form *Form) Sub() *Window {
+func (form *Form) SubWindow() *Window {
 	return (*Window)(unsafe.Pointer((C.form_sub((*C.FORM)(form)))))
+}
+
+type FormsError struct {
+	message string
+}
+
+func (fe FormsError) Error() string {
+	return fe.message
 }

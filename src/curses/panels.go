@@ -1,4 +1,4 @@
-package panels
+package curses
 
 // #define _Bool int
 // #include <panel.h>
@@ -6,18 +6,24 @@ package panels
 import "C"
 
 import (
-	. "github.com/errnoh/gocurse/curses"
 	"unsafe"
 )
 
-type Panel C.PANEL
+//extern NCURSES_EXPORT(int)     set_panel_userptr (PANEL *, NCURSES_CONST void *);
+//extern NCURSES_EXPORT(NCURSES_CONST void*) panel_userptr (const PANEL *);
 
-func (panel *Panel) Window() *Window {
-	return (*Window)(unsafe.Pointer((C.panel_window((*C.PANEL)(panel)))))
-}
+type Panel C.PANEL
 
 func UpdatePanels() {
 	C.update_panels()
+}
+
+func NewPanel(win *Window) *Panel {
+	return (*Panel)(C.new_panel((*C.WINDOW)(unsafe.Pointer((win)))))
+}
+
+func (panel *Panel) Window() *Window {
+	return (*Window)(unsafe.Pointer((C.panel_window((*C.PANEL)(panel)))))
 }
 
 func (panel *Panel) Hide() bool {
@@ -28,7 +34,7 @@ func (panel *Panel) Show() bool {
 	return isOk(C.show_panel((*C.PANEL)(panel)))
 }
 
-func (panel *Panel) Del() bool {
+func (panel *Panel) Delete() bool {
 	return isOk(C.del_panel((*C.PANEL)(panel)))
 }
 
@@ -40,10 +46,6 @@ func (panel *Panel) Bottom() bool {
 	return isOk(C.bottom_panel((*C.PANEL)(panel)))
 }
 
-func NewPanel(win *Window) *Panel {
-	return (*Panel)(C.new_panel((*C.WINDOW)(unsafe.Pointer((win)))))
-}
-
 func (panel *Panel) Above() *Panel {
 	return (*Panel)(C.panel_above((*C.PANEL)(panel)))
 }
@@ -51,9 +53,6 @@ func (panel *Panel) Above() *Panel {
 func (panel *Panel) Below() *Panel {
 	return (*Panel)(C.panel_below((*C.PANEL)(panel)))
 }
-
-//extern NCURSES_EXPORT(int)     set_panel_userptr (PANEL *, NCURSES_CONST void *);
-//extern NCURSES_EXPORT(NCURSES_CONST void*) panel_userptr (const PANEL *);
 
 func (panel *Panel) Move(y, x int) bool {
 	return isOk(C.move_panel((*C.PANEL)(panel), C.int(y), C.int(x)))
