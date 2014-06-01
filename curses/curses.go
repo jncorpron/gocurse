@@ -202,7 +202,7 @@ func HasColors() bool {
 	return isOk(C.has_colors())
 }
 
-func StartColor() error {
+func EnableColor() error {
 	if HasColors() {
 		return CursesError{"terminal does not support color"}
 	}
@@ -211,7 +211,7 @@ func StartColor() error {
 	return nil
 }
 
-func InitPair(pairID int, foreground int, background int) error {
+func InitColorPair(pairID int, foreground int, background int) error {
 	if C.init_pair(C.short(pairID), C.short(foreground), C.short(background)) == 0 {
 		return CursesError{"Init_pair failed"}
 	}
