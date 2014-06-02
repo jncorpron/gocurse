@@ -275,6 +275,10 @@ func (win *Window) GetChar() int {
 	return int(C.wgetch((*C.WINDOW)(win)))
 }
 
+func (win *Window) Timeout(timeout int) {
+	C.wtimeout((*C.WINDOW)(win), C.int(timeout))
+}
+
 func (win *Window) AddGet(x, y int, c int32, flags int32) {
 	C.mvwaddch((*C.WINDOW)(win), C.int(y), C.int(x), C.chtype(c)|C.chtype(flags))
 }
